@@ -40,9 +40,15 @@ Writes the right config for whichever client you name, with that client's own
 quirks handled:
 
 ```bash
-npx @turnip-agentic/zaps-mcp install            # lists the clients
+npx github:turnip-agentic/zaps-agent install            # lists the clients
+npx github:turnip-agentic/zaps-agent install cursor
+npx github:turnip-agentic/zaps-agent install antigravity
+```
+
+Once the package is on npm the shorter form works too:
+
+```bash
 npx @turnip-agentic/zaps-mcp install cursor
-npx @turnip-agentic/zaps-mcp install antigravity
 ```
 
 Run with no arguments and it becomes a **stdio bridge** to the hosted server, so
@@ -53,7 +59,7 @@ harnesses that only speak stdio still work:
   "mcpServers": {
     "zaps": {
       "command": "npx",
-      "args": ["-y", "@turnip-agentic/zaps-mcp"],
+      "args": ["-y", "github:turnip-agentic/zaps-agent"],
       "env": { "ZAPS_API_KEY": "zak_your_key" }
     }
   }
