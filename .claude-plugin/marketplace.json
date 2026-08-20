@@ -1,0 +1,14 @@
+{
+  "name": "zaps",
+  "owner": { "name": "Zaps", "url": "https://zaps.design" },
+  "description": "Zaps — templates to finished designs, callable by agents.",
+  "plugins": [
+    {
+      "name": "zaps",
+      "source": "./",
+      "description": "Search Zaps design templates and fill them with your own images.",
+      "category": "Productivity",
+      "keywords": ["design", "templates", "social-media"]
+    }
+  ]
+}

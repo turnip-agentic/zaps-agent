@@ -1,0 +1,11 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "design.zaps.templates",
+  "version": "1.0.0",
+  "description": "Search Zaps design templates and fill them with your own images.",
+  "author": { "name": "Zaps", "url": "https://zaps.design" },
+  "homepage": "https://zaps.design/docs/api",
+  "repository": "https://github.com/turnip-agentic/zaps-agent",
+  "license": "Apache-2.0",
+  "keywords": ["design", "templates", "instagram", "social-media", "image-generation"]
+}
