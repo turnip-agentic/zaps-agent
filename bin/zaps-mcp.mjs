@@ -14,6 +14,10 @@ import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
 const ENDPOINT = process.env.ZAPS_MCP_URL || 'https://zaps.design/mcp'
+// Print the invocation that works right now. The npm name is the nicer one, but
+// telling someone to run a package that is not published yet is worse than a
+// longer command that is.
+const INVOKE = 'npx github:turnip-agentic/zaps-agent'
 const KEY_FLAG = process.argv.findIndex((a) => a === '--key')
 const KEY = (KEY_FLAG > -1 ? process.argv[KEY_FLAG + 1] : '') || process.env.ZAPS_API_KEY || ''
 
@@ -89,7 +93,7 @@ function install(which) {
   if (!which) {
     console.log('\nZaps MCP — pick your client:\n')
     for (const [name, c] of Object.entries(CLIENTS)) {
-      console.log(`  npx @turnip-agentic/zaps-mcp install ${name.padEnd(12)} ${c.label}`)
+      console.log(`  ${INVOKE} install ${name.padEnd(12)} ${c.label}`)
     }
     console.log('\nOr add it by hand — the endpoint is just a url:\n')
     console.log(`  ${ENDPOINT}\n`)
