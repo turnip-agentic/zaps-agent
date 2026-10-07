@@ -1,7 +1,7 @@
 {
   "name": "@turnip-agentic/zaps-mcp",
-  "version": "1.0.0",
-  "description": "Zaps MCP server \u2014 stdio bridge and one-command config for every major agent client.",
+  "version": "1.1.0",
+  "description": "Zaps for agents: connect any MCP client to Zaps, or bridge stdio to the hosted server.",
   "type": "module",
   "bin": {
     "zaps-mcp": "bin/zaps-mcp.mjs"
@@ -10,19 +10,9 @@
   "engines": {
     "node": ">=20"
   },
-  "files": [
-    "bin",
-    "README.md",
-    "skills"
-  ],
-  "keywords": [
-    "mcp",
-    "modelcontextprotocol",
-    "zaps",
-    "design",
-    "templates"
-  ],
-  "homepage": "https://zaps.design/docs/api",
+  "files": ["bin", "README.md", "skills"],
+  "keywords": ["mcp", "modelcontextprotocol", "zaps", "design", "templates"],
+  "homepage": "https://zaps.design",
   "repository": {
     "type": "git",
     "url": "https://github.com/turnip-agentic/zaps-agent.git"

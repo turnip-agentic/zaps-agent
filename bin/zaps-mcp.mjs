@@ -1,61 +1,53 @@
 #!/usr/bin/env node
 // Two jobs, one binary.
 //
-//   npx @turnip-agentic/zaps-mcp                 → stdio ⇄ HTTP bridge
-//   npx @turnip-agentic/zaps-mcp install [client] → write that client's config
+//   npx github:turnip-agentic/zaps-agent install [client]  → connect that client to Zaps
+//   npx github:turnip-agentic/zaps-agent                   → stdio ⇄ HTTP bridge
 //
-// The bridge exists because not every harness speaks remote HTTP MCP yet, and
-// the ones that don't all speak stdio. It is a pipe, not a server: it adds the
-// Authorization header and forwards bytes, so there is one implementation of the
-// protocol (the hosted one) rather than two that can drift.
+// Connecting is only ever the URL. The server lets anyone search and make a first design,
+// and when a call needs an account the client is sent through a browser sign-in (OAuth),
+// so there is no key to mint, paste or store.
+//
+// The bridge is for a harness that speaks only stdio. It is a pipe, not a server: one
+// implementation of the protocol (the hosted one) rather than two that can drift. A stdio
+// client cannot run the browser sign-in, so through the bridge the free design is the limit.
 import { createInterface } from 'node:readline'
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 
-const ENDPOINT = process.env.ZAPS_MCP_URL || 'https://zaps.design/mcp'
-// Print the invocation that works right now. The npm name is the nicer one, but
-// telling someone to run a package that is not published yet is worse than a
-// longer command that is.
+const ENDPOINT = process.env.ZAPS_MCP_URL || 'https://api.zaps.design/mcp'
 const INVOKE = 'npx github:turnip-agentic/zaps-agent'
-const KEY_FLAG = process.argv.findIndex((a) => a === '--key')
-const KEY = (KEY_FLAG > -1 ? process.argv[KEY_FLAG + 1] : '') || process.env.ZAPS_API_KEY || ''
 
+// A client with its own "add a server" command is told to use it: that command knows the
+// client's config better than a file write does. The rest get their config file updated.
 const CLIENTS = {
-  claude: {
-    label: 'Claude Code',
-    how: 'one line, no file to edit',
-    command: [
-      `claude mcp add --transport http zaps ${ENDPOINT} \\`,
-      `  --header "Authorization: Bearer ${KEY || 'zak_your_key'}"`,
-    ].join('\n'),
-  },
-  codex: {
-    label: 'Codex',
-    file: join(homedir(), '.codex', 'config.toml'),
-    // TOML, and Codex reads the token from an env var rather than inline.
-    toml: `\n[mcp_servers.zaps]\nurl = "${ENDPOINT}"\nbearer_token_env_var = "ZAPS_API_KEY"\n`,
+  claude: { label: 'Claude Code', run: ['claude', 'mcp', 'add', '--transport', 'http', 'zaps', ENDPOINT] },
+  codex: { label: 'Codex', run: ['codex', 'mcp', 'add', 'zaps', '--url', ENDPOINT] },
+  gemini: { label: 'Gemini CLI', run: ['gemini', 'mcp', 'add', '--transport', 'http', 'zaps', ENDPOINT] },
+  antigravity: { label: 'Antigravity', run: ['agy', 'mcp', 'add', 'zaps', ENDPOINT] },
+  vscode: {
+    label: 'VS Code / GitHub Copilot',
+    run: ['code', '--add-mcp', JSON.stringify({ name: 'zaps', type: 'http', url: ENDPOINT })],
   },
   cursor: {
     label: 'Cursor',
     file: join(homedir(), '.cursor', 'mcp.json'),
     key: 'mcpServers',
-    entry: { url: ENDPOINT, headers: { Authorization: 'Bearer ${env:ZAPS_API_KEY}' } },
+    entry: { url: ENDPOINT },
   },
-  vscode: {
-    label: 'VS Code / Copilot',
-    file: join(process.cwd(), '.vscode', 'mcp.json'),
-    // VS Code wraps servers under "servers", not "mcpServers".
-    key: 'servers',
-    entry: { type: 'http', url: ENDPOINT },
-  },
-  antigravity: {
-    label: 'Antigravity',
-    file: join(homedir(), '.gemini', 'config', 'mcp_config.json'),
+  windsurf: {
+    label: 'Windsurf',
+    file: join(homedir(), '.codeium', 'windsurf', 'mcp_config.json'),
     key: 'mcpServers',
-    // Antigravity requires serverUrl and rejects url — the single most common
-    // reason a copied config silently fails there.
-    entry: { serverUrl: ENDPOINT, headers: { Authorization: `Bearer ${KEY || 'zak_your_key'}` } },
+    entry: { serverUrl: ENDPOINT },
+  },
+  opencode: {
+    label: 'opencode',
+    file: join(homedir(), '.config', 'opencode', 'opencode.json'),
+    key: 'mcp',
+    entry: { type: 'remote', url: ENDPOINT },
   },
 }
 
@@ -78,26 +70,15 @@ function writeJsonConfig(spec) {
   console.log(`${existed ? 'updated' : 'added'} "zaps" in ${spec.file}`)
 }
 
-function appendToml(spec) {
-  mkdirSync(dirname(spec.file), { recursive: true })
-  const current = existsSync(spec.file) ? readFileSync(spec.file, 'utf8') : ''
-  if (current.includes('[mcp_servers.zaps]')) {
-    console.log(`"zaps" is already in ${spec.file} — left unchanged`)
-    return
-  }
-  writeFileSync(spec.file, current + spec.toml)
-  console.log(`added [mcp_servers.zaps] to ${spec.file}`)
-}
-
 function install(which) {
   if (!which) {
-    console.log('\nZaps MCP — pick your client:\n')
+    console.log('\nZaps for agents — pick your client:\n')
     for (const [name, c] of Object.entries(CLIENTS)) {
       console.log(`  ${INVOKE} install ${name.padEnd(12)} ${c.label}`)
     }
-    console.log('\nOr add it by hand — the endpoint is just a url:\n')
+    console.log('\nOr add it by hand. The whole configuration is one URL:\n')
     console.log(`  ${ENDPOINT}\n`)
-    console.log('Mint a key at https://zaps.design/account (starts with zak_).\n')
+    console.log('No key: the first design is free, and signing in happens in your browser when needed.\n')
     return
   }
   const spec = CLIENTS[which]
@@ -105,27 +86,20 @@ function install(which) {
     console.error(`unknown client "${which}". Known: ${Object.keys(CLIENTS).join(', ')}`)
     process.exit(1)
   }
-  if (spec.command) {
-    console.log(`\n${spec.label} takes it directly — ${spec.how}:\n`)
-    console.log(spec.command + '\n')
-    return
+  if (spec.run) {
+    const [cmd, ...args] = spec.run
+    const res = spawnSync(cmd, args, { stdio: 'inherit' })
+    if (res.error) {
+      console.error(`\n${cmd} is not on your PATH. Run this once ${spec.label} is installed:\n`)
+      console.error(`  ${[cmd, ...args.map((a) => (/[\s{"]/.test(a) ? `'${a}'` : a))].join(' ')}\n`)
+      process.exit(1)
+    }
+    process.exit(res.status ?? 0)
   }
-  if (spec.toml) appendToml(spec)
-  else writeJsonConfig(spec)
-  if (!KEY) {
-    console.log('\nNow set your key so the client can authenticate:')
-    console.log("  export ZAPS_API_KEY='zak_...'   # from https://zaps.design/account\n")
-  }
+  writeJsonConfig(spec)
 }
 
 async function bridge() {
-  if (!KEY) {
-    // Fail loudly at startup rather than turning every tool call into a 401 the
-    // user has to decode.
-    process.stderr.write(
-      'zaps-mcp: no key. Set ZAPS_API_KEY or pass --key. Mint one at https://zaps.design/account\n',
-    )
-  }
   const send = (obj) => process.stdout.write(JSON.stringify(obj) + '\n')
   const rl = createInterface({ input: process.stdin })
   for await (const line of rl) {
@@ -141,34 +115,27 @@ async function bridge() {
     try {
       const res = await fetch(ENDPOINT, {
         method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          ...(KEY ? { authorization: `Bearer ${KEY}` } : {}),
-        },
+        headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' },
         body: JSON.stringify(msg),
       })
       // Notifications get 202 and no body; there is nothing to relay.
       if (res.status === 202 || res.headers.get('content-length') === '0') continue
       const text = await res.text()
       if (!text) continue
-      // An HTTP-level error (a 401 challenge, say) has no JSON-RPC envelope, and a
-      // client that receives one cannot match it to the request it sent — it waits
-      // for a reply that never comes. Wrap it, and carry the WWW-Authenticate
-      // challenge through so the user is told what to do about it.
       let envelope = null
       try {
         envelope = JSON.parse(text)
       } catch {
-        // Not JSON at all — treat it as an error string below.
+        // Not JSON at all — treated as an error string below.
       }
-      // `jsonrpc` is the only reliable discriminator: the server's 401 body is
-      // {"error": "..."} , which has an error key but is not a JSON-RPC message.
+      // `jsonrpc` is the only reliable discriminator: an HTTP-level refusal is
+      // {"error": "..."}, which has an error key but is not a JSON-RPC message, and a
+      // client that receives it cannot match it to its request and waits forever.
       if (envelope && envelope.jsonrpc === '2.0') {
         process.stdout.write(text.endsWith('\n') ? text : text + '\n')
         continue
       }
       if (msg.id !== undefined) {
-        const challenge = res.headers.get('www-authenticate')
         const detail = envelope?.error || text.slice(0, 200)
         send({
           jsonrpc: '2.0',
@@ -177,16 +144,15 @@ async function bridge() {
             code: res.status === 401 ? -32001 : -32603,
             message:
               res.status === 401
-                ? 'zaps-mcp: not authorized. Set ZAPS_API_KEY to a key from https://zaps.design/account'
-                : `zaps-mcp: HTTP ${res.status}: ${detail}`,
-            ...(challenge ? { data: { wwwAuthenticate: challenge } } : {}),
+                ? `zaps: ${detail}. Connect ${ENDPOINT} directly as a remote server to sign in.`
+                : `zaps: HTTP ${res.status}: ${detail}`,
           },
         })
       }
     } catch (e) {
       // A transport failure must still answer the request or the client hangs.
       if (msg.id !== undefined) {
-        send({ jsonrpc: '2.0', id: msg.id, error: { code: -32603, message: `zaps-mcp: ${e.message}` } })
+        send({ jsonrpc: '2.0', id: msg.id, error: { code: -32603, message: `zaps: ${e.message}` } })
       }
     }
   }
@@ -195,5 +161,5 @@ async function bridge() {
 const [, , cmd, arg] = process.argv
 if (cmd === 'install') install(arg)
 else if (cmd === '--help' || cmd === '-h') install(undefined)
-else if (cmd === '--version' || cmd === '-v') console.log('1.0.0')
+else if (cmd === '--version' || cmd === '-v') console.log('1.1.0')
 else await bridge()

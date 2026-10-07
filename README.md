@@ -1,154 +1,63 @@
 # Zaps for agents
 
-Zaps turns a description into a finished design. This repo is the distribution
-bundle: one skill, one MCP server pointer, and the three manifests different
-clients look for.
+Turn someone's photos into finished social-media designs (stories, carousels, reel covers,
+invites) from any AI agent. Give it photos and a brief, and Zaps picks matching templates,
+places the photos and the words, and returns finished images with a link to keep editing
+each one in the Zaps editor.
 
-Nothing here is a server. The MCP server is remote and hosted — you add a url,
-you do not install code.
+- **No key, no signup to start.** Searching and the first design are free with no account.
+- **Signing in is a browser click.** When a call needs an account, your client opens a
+  Zaps sign-in page (OAuth). After that it stays signed in.
+- **One hosted server:** `https://api.zaps.design/mcp` (MCP, Streamable HTTP).
 
-## Add it
+## Install
 
-### Claude Code — the marketplace (recommended)
+| Client | Command |
+|---|---|
+| Claude Code | `/plugin marketplace add turnip-agentic/zaps-agent` then `/plugin install zaps@zaps` |
+| Claude Code (server only) | `claude mcp add --transport http zaps https://api.zaps.design/mcp` |
+| Codex | `codex plugin marketplace add turnip-agentic/zaps-agent` then `codex plugin add zaps@zaps` |
+| Antigravity | `agy plugin install <path to a clone of this repo>` or `agy mcp add zaps https://api.zaps.design/mcp` |
+| Gemini CLI | `gemini extensions install https://github.com/turnip-agentic/zaps-agent` |
+| Cursor | `npx github:turnip-agentic/zaps-agent install cursor` |
+| Windsurf | `npx github:turnip-agentic/zaps-agent install windsurf` |
+| opencode | `npx github:turnip-agentic/zaps-agent install opencode` |
+| VS Code / GitHub Copilot | `code --add-mcp '{"name":"zaps","type":"http","url":"https://api.zaps.design/mcp"}'` |
+| Any agent with skills | `npx skills add turnip-agentic/zaps-agent` |
+| ChatGPT | Find **Zaps** in the ChatGPT plugin directory |
+| Anything else | Add `https://api.zaps.design/mcp` as a remote (HTTP) MCP server |
 
-Two lines. You get the MCP server *and* the skill, which is what teaches the
-model to search before it fills instead of guessing at a template:
+No install at all? One GET makes a design:
+`https://api.zaps.design/make?brief=Birthday%20Party,%20Friends&photo=<public photo url>&text=Happy%20Birthday`.
+In a browser, `https://api.zaps.design/make` is a form that takes photo files.
 
-```
-/plugin marketplace add turnip-agentic/zaps-agent
-/plugin install zaps@zaps
-```
+## What is in here
 
-It will ask for your API key once and store it in your keychain — no config file
-to edit, and the key never lands in a repo. Non-interactively:
+| Path | For |
+|---|---|
+| `skills/zaps-design/SKILL.md` | The skill: how to write the brief, upload photos and make designs |
+| `plugin.json`, `mcp.json` | [Agent Plugins](https://agent-plugins.org) manifest (ChatGPT, Codex, Cursor) |
+| `.claude-plugin/`, `.mcp.json` | Claude Code plugin and marketplace |
+| `.agents/plugins/marketplace.json` | Codex marketplace |
+| `mcp_config.json` | Antigravity plugin MCP config |
+| `gemini-extension.json`, `GEMINI.md` | Gemini CLI extension |
+| `server.json` | [MCP Registry](https://registry.modelcontextprotocol.io) entry |
+| `bin/zaps-mcp.mjs` | `install <client>` helper, and a stdio bridge for clients without remote MCP |
 
-```bash
-claude plugin marketplace add turnip-agentic/zaps-agent
-claude plugin install zaps@zaps --config api_key=zak_your_key
-```
+## Tools
 
-### Just the server, no install
+| Tool | Does |
+|---|---|
+| `create_designs` | Photos and a brief in, several finished designs out. The main call. |
+| `upload_images` | Upload links (or inline bytes) for photos on the caller's machine. Free. |
+| `search_templates` | Rank the template catalogue by a description. Free. |
+| `fill_template` | Render one chosen template with photos. |
 
-```bash
-claude mcp add --transport http zaps https://zaps.design/mcp \
-  --header "Authorization: Bearer zak_your_key"
-```
+Docs: https://zaps.design/docs/api · Privacy: https://zaps.design/privacy ·
+Terms: https://zaps.design/terms · Support: https://zaps.design/support
 
-### npx — any client, one command
+## Privacy Policy
 
-Writes the right config for whichever client you name, with that client's own
-quirks handled:
-
-```bash
-npx github:turnip-agentic/zaps-agent install            # lists the clients
-npx github:turnip-agentic/zaps-agent install cursor
-npx github:turnip-agentic/zaps-agent install antigravity
-```
-
-Once the package is on npm the shorter form works too:
-
-```bash
-npx @turnip-agentic/zaps-mcp install cursor
-```
-
-Run with no arguments and it becomes a **stdio bridge** to the hosted server, so
-harnesses that only speak stdio still work:
-
-```json
-{
-  "mcpServers": {
-    "zaps": {
-      "command": "npx",
-      "args": ["-y", "github:turnip-agentic/zaps-agent"],
-      "env": { "ZAPS_API_KEY": "zak_your_key" }
-    }
-  }
-}
-```
-
-The bridge is a pipe, not a second implementation: it adds the Authorization
-header and forwards bytes, so there is one copy of the protocol to keep correct.
-
-**Codex** — in `~/.codex/config.toml`:
-
-```toml
-[mcp_servers.zaps]
-url = "https://zaps.design/mcp"
-bearer_token_env_var = "ZAPS_API_KEY"
-```
-
-**Antigravity** — in `~/.gemini/config/mcp_config.json`. Note the field name:
-Antigravity requires `serverUrl` and rejects `url`.
-
-```json
-{
-  "mcpServers": {
-    "zaps": {
-      "serverUrl": "https://zaps.design/mcp",
-      "headers": { "Authorization": "Bearer zak_your_key" }
-    }
-  }
-}
-```
-
-**Cursor** — `.cursor/mcp.json`:
-
-```json
-{
-  "mcpServers": {
-    "zaps": {
-      "url": "https://zaps.design/mcp",
-      "headers": { "Authorization": "Bearer ${env:ZAPS_API_KEY}" }
-    }
-  }
-}
-```
-
-**VS Code / Copilot** — `.vscode/mcp.json`. Note the wrapper key is `servers`,
-not `mcpServers`:
-
-```json
-{
-  "servers": {
-    "zaps": { "type": "http", "url": "https://zaps.design/mcp" }
-  }
-}
-```
-
-**Any other harness** — drop the skill in and it works with plain curl:
-
-```bash
-mkdir -p ~/.agents/skills
-curl -s https://zaps.design/.well-known/agent-skills/zaps-design/SKILL.md \
-  -o ~/.agents/skills/zaps-design/SKILL.md
-```
-
-`~/.agents/skills/` is the cross-client convention — around forty clients read
-it, including Claude, Codex, Cursor, VS Code, Gemini CLI and Antigravity.
-
-## The key
-
-Mint one at https://zaps.design/account. It starts with `zak_`, it is shown once,
-and revoking it takes effect immediately. Search is free; each render spends one
-agentic token.
-
-## What the tools do
-
-| tool | cost | what it takes |
-|---|---|---|
-| `search_templates` | free | `query` — what the design is for, in plain words |
-| `fill_template` | 1 token | `scene` from a search hit, plus `images` urls in placement order |
-
-Full reference: https://zaps.design/docs/api · OpenAPI:
-https://zaps.design/openapi.json · everything machine-readable:
-https://zaps.design/.well-known/api-catalog
-
-## Why three manifests
-
-There is no single plugin format yet. `.claude-plugin/plugin.json` is
-Anthropic's, `.codex-plugin/plugin.json` is OpenAI's, and the root `plugin.json`
-is the vendor-neutral Agent Plugins v1.0.0 spec. All three describe the same
-bundle, and each client ignores the others — Anthropic's loader ignores unknown
-top-level keys, and Codex reads `.claude-plugin/marketplace.json` as a
-legacy-compatible marketplace, so the overlap is deliberate rather than
-duplicated by accident.
+The photos and text you send are used to make your designs. How Zaps collects, uses,
+shares and retains data is set out in its privacy policy: https://zaps.design/privacy.
+Contact: https://zaps.design/support.

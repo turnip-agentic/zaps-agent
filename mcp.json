@@ -3,7 +3,7 @@
   "mcpServers": {
     "zaps": {
       "type": "streamable-http",
-      "url": "https://zaps.design/mcp"
+      "url": "https://api.zaps.design/mcp"
     }
   }
 }

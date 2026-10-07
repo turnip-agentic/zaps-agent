@@ -1,14 +1,21 @@
 {
   "name": "zaps",
-  "owner": { "name": "Zaps", "url": "https://zaps.design" },
-  "description": "Zaps — templates to finished designs, callable by agents.",
+  "owner": {
+    "name": "Zaps",
+    "url": "https://zaps.design"
+  },
+  "description": "Zaps: your photos into finished social-media designs.",
   "plugins": [
     {
       "name": "zaps",
       "source": "./",
-      "description": "Search Zaps design templates and fill them with your own images.",
-      "category": "Productivity",
-      "keywords": ["design", "templates", "social-media"]
+      "description": "Turn your photos into finished social-media designs: stories, carousels, reel covers and invites from professionally made templates, filled with your photos and your words.",
+      "category": "design",
+      "keywords": [
+        "design",
+        "templates",
+        "social-media"
+      ]
     }
   ]
 }

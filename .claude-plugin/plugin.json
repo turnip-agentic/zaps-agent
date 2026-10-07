@@ -1,21 +1,23 @@
 {
   "name": "zaps",
   "displayName": "Zaps",
-  "version": "1.0.0",
-  "description": "Search Zaps design templates and fill them with your own images.",
-  "author": { "name": "Zaps", "url": "https://zaps.design" },
-  "homepage": "https://zaps.design/docs/api",
+  "version": "1.1.0",
+  "description": "Turn your photos into finished social-media designs: stories, carousels, reel covers and invites from professionally made templates, filled with your photos and your words.",
+  "author": {
+    "name": "Zaps",
+    "url": "https://zaps.design"
+  },
+  "homepage": "https://zaps.design",
   "repository": "https://github.com/turnip-agentic/zaps-agent",
   "license": "Apache-2.0",
-  "keywords": ["design", "templates", "social-media"],
+  "keywords": [
+    "design",
+    "templates",
+    "instagram",
+    "stories",
+    "invites",
+    "social-media"
+  ],
   "skills": "./skills/",
-  "mcpServers": "./.mcp.json",
-  "userConfig": {
-    "api_key": {
-      "type": "string",
-      "title": "Zaps API key",
-      "description": "Mint one at https://zaps.design/account — it starts with zak_.",
-      "sensitive": true
-    }
-  }
+  "mcpServers": "./.mcp.json"
 }

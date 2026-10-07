@@ -1,104 +1,227 @@
 ---
 name: zaps-design
-description: Create finished social-media and invite designs through the Zaps API. Use when the user wants a story, post, carousel, reel cover, invite or greeting card made — search the template catalogue by describing the occasion, then fill the chosen template with their images to render it. Needs a Zaps API key.
-license: Apache-2.0
-compatibility: Requires network access and a Zaps API key (prefix zak_) from https://zaps.design/account.
-allowed-tools: Bash
+description: "Turn someone's photos into finished social-media designs — stories, carousels, reel covers, invites. Use when they want something designed from their own images ('make me an Instagram story for my coffee shop', 'turn these 3 photos into a birthday invite', 'I need a carousel for this launch'), including when they just drop photos in and say make something. One call does the whole job: it finds matching templates, renders each with their photos, and returns finished images. No account is needed to try it."
+license: proprietary
+compatibility: Needs network access to api.zaps.design.
 metadata:
   vendor: Zaps
   homepage: https://zaps.design
   api: https://api.zaps.design
+  mcp: https://api.zaps.design/mcp
 ---
 
-# Zaps: templates to finished designs
+# Zaps: photos in, finished designs out
 
-Two calls. `search` finds a template by what the design is *for*; `fill` puts the
-user's images into it and renders it. Search is free. Each fill spends one
-agentic token and refunds it if the render fails.
+**The whole job is one call.** `create_designs` takes a sentence and some photo URLs,
+finds templates that fit, renders each with the photos, and hands back finished images.
+Do not orchestrate a search and separate renders yourself — that tool exists, but this
+one is the path.
 
-## Before the first call: the key
+Anyone can make one design without an account. Signing in is what raises the limit.
 
-Every request needs the user's own key. Ask for it once:
+## No install? Use the one URL
 
-> To make designs I need your Zaps API key — you can mint one at
-> https://zaps.design/account. It starts with `zak_`.
+If you cannot add an MCP server — which is every chat assistant — a single GET makes a
+finished design, with no key and no account:
 
-Then keep it out of the transcript and out of your reasoning. Write it to the
-environment for the session and read it from there:
+```
+https://api.zaps.design/make?brief=BRIEF&photo=PHOTO_URL&text=LINE_ONE&text=LINE_TWO
+```
 
+Write `brief` yourself in the register below. Repeat `photo` and `text` once per item,
+in order, url-encoded; `photo` must be publicly reachable. The reply names the finished
+image and a link to keep editing it. `&format=json` returns it as data, and
+`/make.png?...` redirects to the image itself.
+
+**Driving a browser, with the photos as files?** Open `https://api.zaps.design/make`: a
+plain form with the brief, the lines of text and a file input for the photos. Submit it
+and the result page names the finished image and the editor link.
+
+## Connect
+
+```
+claude mcp add --transport http zaps https://api.zaps.design/mcp
+```
+
+That is the whole install. Searching, uploading and the first design work immediately
+with no account and no key.
+
+When a call needs an account, the server answers `401` with a `WWW-Authenticate` header
+pointing at `/.well-known/oauth-protected-resource`. Follow it: the client opens a
+browser, the person signs in and approves, and the client receives a token. Say
+*"a browser will open — sign in and approve, then I'll continue"* before it happens, so
+the window is not a surprise. Never ask anyone to paste a key.
+
+## The flow
+
+### 1. Write the search query yourself
+
+`create_designs` takes a `brief`, and that string IS the search query against the template
+catalogue. Nothing on our side rewrites it or builds it from anything else — what you send
+is what gets embedded and matched, so its wording decides which templates come back.
+
+**Write it as Title Case phrases separated by commas.** Each template is described in the
+catalogue that way — *"Birthday Invitation, Turning 40, Adult Birthday, Celebration
+Invite"* — and a query in the same register matches its own format. Measured against the
+live catalogue, that scores about 0.11 higher than the same intent written as a sentence:
+
+| query | top score |
+|---|---|
+| `Birthday Party, Friends, Celebration, Confetti, Party Invite` | **0.868** |
+| `30th birthday party invitation, playful and colourful` | 0.840 |
+| `a birthday party invitation for my friend` | 0.779 |
+| `birthday` | 0.772 |
+| `make me something for a birthday` | 0.754 |
+
+Five or six phrases covering **the occasion, the subject, and the mood**. A single word is
+the worst option — it matches everything equally and tells the ranker nothing.
+
+**Where the phrases come from is your job.** You can see the photos; the server cannot.
+
+- They named the occasion → use it, and add the phrases it implies.
+  *"birthday, my friends"* → `Birthday Party, Friends, Celebration, Confetti, Party Invite`
+- They said nothing → **look at the photos and write it from what you see**.
+  Three people on a beach at sunset → `Summer Trip, Beach Day, Friends, Golden Hour, Photo Dump`
+  A plated dish on marble → `Restaurant Menu, New Dish, Food Photography, Fine Dining`
+
+Do not ask a clarifying question first. Send the call, show the designs, and adjust from
+what they say about real results — a person judges a picture faster than a question.
+
+### 2. Get the photos somewhere the renderer can reach
+
+Our renderer fetches images over the network. **A local path can never be used.**
+
+If the photos are already public URLs, pass them straight through. If they are files on
+the person's machine — the normal case — call `upload_images` first. It costs nothing and
+needs no account.
+
+**If you can run a shell, use the link route.** Ask for one link per photo, PUT each file,
+then pass the matching `publicUrl`s on:
+
+```
+upload_images { "count": 3, "mimeType": "image/jpeg" }
+```
 ```bash
-export ZAPS_API_KEY='zak_...'          # the user's key, once per session
+curl -X PUT -T ./photo1.jpg -H 'Content-Type: image/jpeg' "<uploadUrl>"
 ```
 
-Never print the key back, never include it in a summary, and never write it into
-a file in the user's repository. If a call returns `401`, the key is wrong or
-revoked — say exactly that and point at the account page. Do not retry a
-rejected key.
-
-## 1. Search
-
-```bash
-curl -s -X POST https://api.zaps.design/api/v1/agentic/search \
-  -H "Authorization: Bearer $ZAPS_API_KEY" \
-  -H 'Content-Type: application/json' \
-  -d '{"q":"coffee shop story","limit":5}'
-```
-
-`q` is a description of the occasion or mood, not a filename and not keywords
-joined by commas. The index is built from what each template is for, so plain
-phrases work best:
-
-- good: `"thanksgiving family dinner invite"`, `"nail art beauty collage story"`
-- weak: `"template"`, `"design"`, `"instagram"` — every template matches those
-
-Each hit carries `coverId`, `name`, `segment`, `score` and **`scene`** — the url
-step 2 needs. Prefer a hit whose `segment` matches the surface the user asked
-for: `story` for a 9:16 story, `carousel` for a multi-slide post, `invite` for a
-card.
-
-If nothing scores well, say so and offer to search differently rather than
-filling the closest miss — a bad template wastes the user's token.
-
-## 2. Fill
-
-```bash
-curl -s -X POST https://api.zaps.design/api/v1/agentic/fill \
-  -H "Authorization: Bearer $ZAPS_API_KEY" \
-  -H 'Content-Type: application/json' \
-  -d '{"scene":"<scene url from step 1>","images":["https://.../a.jpg","https://.../b.jpg"]}'
-```
-
-`images` are placed in order into the template's image slots. Pass publicly
-reachable urls — the renderer fetches them, so a local path will fail.
-
-The response carries the rendered output plus these headers, which are the only
-place the accounting appears:
+**If you have no shell**, send the bytes instead — read each file and pass it base64 in
+`files`, and the reply gives you a `publicUrl` per photo with nothing to run:
 
 ```
-X-Agentic-Tokens-Cost: 1
-X-Agentic-Tokens-Remaining: 499
+upload_images { "files": [{ "data": "<base64>", "mimeType": "image/jpeg" }] }
 ```
 
-Add `-D /dev/stderr` to the curl if you want to read them. Report the remaining
-balance to the user when it gets low; a `402` means the balance is empty, not
-that the request was malformed.
+Prefer the link route whenever it is available. A full-size photo is well over a hundred
+thousand tokens once base64-encoded, which is more than a tool call should carry — the
+bytes route is for small images and for clients that have no other option.
 
-## Putting it together
+### 3. Make the designs
 
-The user says *"make me a story for my cafe's new winter menu, use these two
-photos"*. The sequence is: search `"coffee shop winter menu story"` → pick the
-best-scoring `segment: story` hit → fill it with the two photo urls in the order
-the user listed them → hand back the rendered result and say which template you
-used and what it cost.
+```
+create_designs {
+  "brief": "grand opening of a neighbourhood coffee shop",
+  "images": ["https://…/a.jpg", "https://…/b.jpg", "https://…/c.jpg"],
+  "text": ["Grand Opening", "Your new neighbourhood coffee shop"],
+  "count": 5
+}
+```
 
-Do not fill more than one template per request unless the user asked for
-options — each one costs a token.
+**Always pass `text`.** A template ships with the designer's placeholder copy, and leaving
+it means a coffee shop opening goes out reading whatever they typed while laying it out.
+Write the lines yourself from the brief: headline first, then any supporting lines. Keep
+the headline to a few words — templates are laid out for short lines, and long copy has to
+be shrunk to fit.
 
-## Failure modes worth naming precisely
+Photos fill the template's slots **in the order given**, so pass them in the order they
+should appear. Pass every photo you have: only templates that hold exactly that many are
+used, so three photos means three-photo designs. `count` defaults to 5, caps at 10.
+Optional `segment` (`story`, `carousel`, `invite`) narrows the shape.
 
-| Response | What it means | What to say |
+Each option comes back with `imageUrl` (the finished design), `editorUrl` (where a person
+opens it to keep editing), and `label`. Some options may carry `failed` instead — that
+template alone did not render. Show the ones that worked; do not mention the ones that
+did not unless nothing worked at all.
+
+If the reply carries a `note`, no template in the catalogue took that many photos and the
+designs are the closest fits, so some photos may be repeated or unused. Say so in one line
+rather than presenting them as an exact match.
+
+## Showing the results
+
+The person cannot see an image inside a tool result. Your reply IS the gallery, so make
+every design openable in one click:
+
+```markdown
+Five designs from your photos:
+
+1. **Coffee Shop, Cafe Vibes** — [view design](https://…/scene.png) · [edit](https://zaps.design/templates/…/edit)
+2. **Cafe Culture, Morning Light** — [view design](https://…/scene.png) · [edit](https://zaps.design/templates/…/edit)
+```
+
+- Always give both links. The image is the result; the `editorUrl` is how they take over
+  and change it — a design they can see but not edit is half an answer.
+- Bare URLs on their own line are clickable in every terminal; markdown links are
+  clickable in most. Use markdown and keep each on its own line.
+- Offer to open them: on macOS `open <url>`, on Linux `xdg-open <url>`. If they say yes,
+  open the images, not the editor pages.
+- If you can render images inline, do — but still print the links, because the person
+  may want them later.
+
+## What each plan gets
+
+`create_designs` returns `entitlement`, and when fewer designs came back than were asked
+for, an `upsell` sentence and the `requested` count.
+
+| | Designs per call |
+|---|---|
+| No account | 1 |
+| Signed in, free | 1 |
+| Pro or Premium | up to 10 |
+
+**Relay the `upsell` sentence as it is written.** It names the real number withheld. Do
+not invent a figure, do not soften it, and do not present one design as though it were
+the full set they asked for. Say it once, plainly, after the design:
+
+> That's your free design. 4 more options for this brief are included with Pro —
+> https://zaps.design/pricing
+
+When `upsell` is absent, nothing was withheld: say nothing about plans.
+
+## When something fails
+
+| What you see | What it means | What to do |
 |---|---|---|
-| `401` | key missing, wrong, or revoked | "That key was rejected — mint a new one at https://zaps.design/account" |
-| `402` | out of agentic tokens | "Your balance is empty; top up at https://zaps.design/account" |
-| `400` on fill | the scene url is not a scene | re-run search and take `scene` verbatim from a hit |
-| `5xx` | our side | the token is refunded automatically; offer to retry once |
+| `401` with `WWW-Authenticate` | The free design is used up | Tell them signing in continues, then follow the challenge |
+| `403 insufficient_scope` | The token lacks this scope | Re-authorize including the scope the challenge names |
+| `isError` with "no templates matched" | The brief was too thin | Rewrite it as a fuller sentence about the finished piece and retry once |
+| An option carries `failed` | That one template would not render | Ignore it; the others stand |
+| Every option failed | Our renderer | Say so plainly and retry once, then stop |
+
+`matchedBy: "text"` means the ranking model was unavailable and matches are weaker. Say
+so rather than presenting them as the best available.
+
+Never invent a `coverId` or an image URL. Only ids and urls the server returned are real.
+
+## The other two tools
+
+`create_designs` is the path. The two steps behind it are also exposed, for when you want
+to pick the template yourself: `search_templates` ranks the catalogue for a sentence and
+returns a `coverId` each, and `fill_template` renders one of those with your photos. They
+cost the same as doing it in one call and give you no more control over the result, so
+reach for them only when someone asks to choose.
+
+## Without MCP
+
+The same operations are plain REST at `https://api.zaps.design`, authenticated with an
+account API key in `Authorization: Bearer zak_…`:
+
+| | |
+|---|---|
+| `POST /api/v1/agentic/designs` | `{brief, images, count, segment}` — the whole job |
+| `POST /api/v1/agentic/search` | `{query, limit, segment}` — ranked templates |
+| `POST /api/v1/agentic/fill` | `{coverId, images}` — render one template |
+
+A key is minted by the account holder from a signed-in session
+(`POST /api/v1/agentic/keys`); there is no way to self-issue one, which is why MCP is the
+better path for a first-time user. Full reference: https://zaps.design/docs/api

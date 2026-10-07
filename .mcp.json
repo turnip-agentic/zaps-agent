@@ -2,8 +2,7 @@
   "mcpServers": {
     "zaps": {
       "type": "http",
-      "url": "https://zaps.design/mcp",
-      "headers": { "Authorization": "Bearer ${user_config.api_key}" }
+      "url": "https://api.zaps.design/mcp"
     }
   }
 }

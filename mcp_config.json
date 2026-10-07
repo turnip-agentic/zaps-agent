@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "zaps": {
+      "serverUrl": "https://api.zaps.design/mcp"
+    }
+  }
+}

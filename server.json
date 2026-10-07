@@ -1,0 +1,18 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "design.zaps/zaps",
+  "title": "Zaps",
+  "description": "Photos and a brief in, finished social-media designs out. First design free, no account.",
+  "version": "1.1.0",
+  "websiteUrl": "https://zaps.design",
+  "repository": {
+    "url": "https://github.com/turnip-agentic/zaps-agent",
+    "source": "github"
+  },
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://api.zaps.design/mcp"
+    }
+  ]
+}
